@@ -41,7 +41,7 @@ flags.DEFINE_integer('batch_size', 8,
                      'Input image size to the network after preprocessing')
 
 # Don't change if testing:
-flags.DEFINE_integer('img_size', 224,
+flags.DEFINE_integer('img_size', 448,
                      'Input image size to the network after preprocessing')
 flags.DEFINE_string('data_format', 'NHWC', 'Data format')
 flags.DEFINE_integer('num_stage', 3, '# of times to iterate regressor')
