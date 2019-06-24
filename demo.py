@@ -111,7 +111,7 @@ def preprocess_image(img_path, json_path=None):
     else:
         scale, center = op_util.get_bbox(json_path)
 
-    crop, proc_param = img_util.scale_and_crop(img, scale, center,
+    crop, proc_param = img_util.scale_and_crop(img, 1, center,
                                                config.img_size)
 
     # Normalize image to [-1, 1]
