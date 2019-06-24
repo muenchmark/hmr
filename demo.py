@@ -1,17 +1,12 @@
 """
 Demo of HMR.
-
 Note that HMR requires the bounding box of the person in the image. The best performance is obtained when max length of the person in the image is roughly 150px. 
-
 When only the image path is supplied, it assumes that the image is centered on a person whose length is roughly 150px.
 Alternatively, you can supply output of the openpose to figure out the bbox and the right scale factor.
-
 Sample usage:
-
 # On images on a tightly cropped image around the person
 python -m demo --img_path data/im1963.jpg
 python -m demo --img_path data/coco1.png
-
 # On images, with openpose output
 python -m demo --img_path data/random.jpg --json_path data/random_keypoints.json
 """
@@ -111,7 +106,7 @@ def preprocess_image(img_path, json_path=None):
     else:
         scale, center = op_util.get_bbox(json_path)
 
-    crop, proc_param = img_util.scale_and_crop(img, 1, center,
+    crop, proc_param = img_util.scale_and_crop(img, scale, center,
                                                config.img_size)
 
     # Normalize image to [-1, 1]
@@ -128,15 +123,76 @@ def main(img_path, json_path=None):
     # Add batch dimension: 1 x D x D x 3
     input_img = np.expand_dims(input_img, 0)
 
-    # Theta is the 85D vector holding [camera, pose, shape]
-    # where camera is 3D [s, tx, ty]
-    # pose is 72D vector holding the rotation of 24 joints of SMPL in axis angle format
-    # shape is 10D shape coefficients of SMPL
     joints, verts, cams, joints3d, theta = model.predict(
         input_img, get_theta=True)
 
+#     print('JOINTS 3D:')
+#     print(joints3d.shape)
+#     print(joints3d)
+
+    joints_names = ['Ankle.R_x', 'Ankle.R_y', 'Ankle.R_z',
+                   'Knee.R_x', 'Knee.R_y', 'Knee.R_z',
+                   'Hip.R_x', 'Hip.R_y', 'Hip.R_z',
+                   'Hip.L_x', 'Hip.L_y', 'Hip.L_z',
+                   'Knee.L_x', 'Knee.L_y', 'Knee.L_z', 
+                   'Ankle.L_x', 'Ankle.L_y', 'Ankle.L_z',
+                   'Wrist.R_x', 'Wrist.R_y', 'Wrist.R_z', 
+                   'Elbow.R_x', 'Elbow.R_y', 'Elbow.R_z', 
+                   'Shoulder.R_x', 'Shoulder.R_y', 'Shoulder.R_z', 
+                   'Shoulder.L_x', 'Shoulder.L_y', 'Shoulder.L_z',
+                   'Elbow.L_x', 'Elbow.L_y', 'Elbow.L_z',
+                   'Wrist.L_x', 'Wrist.L_y', 'Wrist.L_z', 
+                   'Neck_x', 'Neck_y', 'Neck_z', 
+                   'Head_x', 'Head_y', 'Head_z', 
+                   'Nose_x', 'Nose_y', 'Nose_z', 
+                   'Eye.L_x', 'Eye.L_y', 'Eye.L_z', 
+                   'Eye.R_x', 'Eye.R_y', 'Eye.R_z', 
+                   'Ear.L_x', 'Ear.L_y', 'Ear.L_z', 
+                   'Ear.R_x', 'Ear.R_y', 'Ear.R_z']
+    
+    joints_export = pd.DataFrame(joints3d.reshape(1,57), columns=joints_names)
+    joints_export.index.name = 'frame'
+    
+    joints_export.iloc[:, 1::3] = joints_export.iloc[:, 1::3]*-1
+    joints_export.iloc[:, 2::3] = joints_export.iloc[:, 2::3]*-1
+
+#     col_list = list(joints_export)
+
+#     col_list[1::3], col_list[2::3] = col_list[2::3], col_list[1::3]
+
+#     joints_export = joints_export[col_list]
+    
+    hipCenter = joints_export.loc[:][['Hip.R_x', 'Hip.R_y', 'Hip.R_z',
+                                      'Hip.L_x', 'Hip.L_y', 'Hip.L_z']]
+
+    joints_export['hip.Center_x'] = hipCenter.iloc[0][::3].sum()/2
+    joints_export['hip.Center_y'] = hipCenter.iloc[0][1::3].sum()/2
+    joints_export['hip.Center_z'] = hipCenter.iloc[0][2::3].sum()/2
+    
+    joints_export.to_csv("hmr/output/csv/"+os.path.splitext(os.path.basename(img_path))[0]+".csv")
+    
+#     pose = pd.DataFrame(theta[:, 3:75])
+    
+#     pose.to_csv("hmr/output/theta_test.csv", header=None, index=None)
+    
+#     print('THETA:', pose.shape, pose)
+    
+#     import cv2
+#     rotations = [cv2.Rodrigues(aa)[0] for aa in pose.reshape(-1, 3)]
+#     print('ROTATIONS:', rotations)
+    
     visualize(img_path, img, proc_param, joints[0], verts[0], cams[0])
 
+def join_csv():
+  path = 'hmr/output/csv/'                   
+  all_files = glob.glob(os.path.join(path, "*.csv")    )
+
+  df_from_each_file = (pd.read_csv(f) for f in sorted(all_files))
+  concatenated_df   = pd.concat(df_from_each_file, ignore_index=True)
+
+  concatenated_df['frame'] = concatenated_df.index+1
+  concatenated_df.to_csv("hmr/output/csv_joined/csv_joined.csv", index=False)
+    
 if __name__ == '__main__':
     config = flags.FLAGS
     config(sys.argv)
@@ -151,4 +207,4 @@ if __name__ == '__main__':
     
     join_csv()
     
-    print('\nResult is in hmr/output (you can open images in Colaboratory by double-clicking them)')
+print('\nResult is in hmr/output (you can open images in Colaboratory by double-clicking them)')
